@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import messagebox
 import random
 import pyperclip
+import json
 
 # ---------------------------- PASSWORD GENERATOR ------------------------------- #
 
@@ -32,13 +33,13 @@ def generate_password():
 
     # Insert the password into the field and also copy it to clipboard
     password_entry.insert(0, password)
-    copy_text_to_clipboard(password)
 
 def delete_field(field):
     field.delete(0, tk.END)
 
 def copy_text_to_clipboard(to_copy):
     pyperclip.copy(to_copy)
+    show_copy_confirmation()
 # ---------------------------- SAVE PASSWORD ------------------------------- #
 
 def save_data():
@@ -46,17 +47,31 @@ def save_data():
     fields_filled = check_empty_fields()
 
     if fields_filled:
-        website = website_entry.get()
+        website = str(website_entry.get()).lower() # make it lowercase 
         email = email_entry.get()
         password = password_entry.get()
 
         confirm = show_confirmation_message()
-
+# If it's confirmed, copy the password to clipboard and save the data into JSON format
         if confirm:
-            with open("data.txt", "a") as file:
-                file.write(f"{website} \n {email} \n {password}\n\n")
+            new_data = {website: {
+                            "email": email,
+                            "password": password}}
+            copy_text_to_clipboard(password)
 
-    clear_entry()
+# if file is not found, create a new file and put in the data as the first entry
+            try:
+                with open("data.json", "r") as file:
+                    data = json.load(file) # load the file (Read)
+                    data.update(new_data) # update the content of that file with our new entry (Update)
+            except FileNotFoundError:
+                    print("File being created")
+                    data = new_data
+            finally:
+                with open("data.json", "w") as file:
+                    json.dump(data, file, indent=4)  # dump the data into the file (Save)
+
+    clear_entry() # clear the fields after saving the data
 
 # Clear the fields
 def clear_entry():
@@ -69,6 +84,10 @@ def show_confirmation_message():
     confirmation = messagebox.askyesno("Confirm details", f"Are the details correct to save? \n\nWebsite: {website_entry.get()} \nEmail: {email_entry.get()} \nPassword: {password_entry.get()}")
     return confirmation
 
+# Alert user that password is copied to clipboard
+def show_copy_confirmation():
+    messagebox.showinfo("Copied", "The password has been copied to clipboard.")
+
 # Ensuring validity of data
 def check_empty_fields():
 
@@ -78,6 +97,39 @@ def check_empty_fields():
     else:
         return True
 
+
+# ----------------------------- SEARCH -------------------------------- #
+def search_data():
+
+    searchterm = str(website_entry.get()).lower()
+
+    if len(searchterm) == 0:
+        check_empty_fields()
+
+    else:
+        try:
+            with open("data.json", "r") as file:
+                data = json.load(file) # load the file (Read)
+
+        except FileNotFoundError:
+                 messagebox.showerror("No Data", "There's no data to search through.")
+        else: 
+                if searchterm in data.keys():
+        
+                    username = data[searchterm].get('email')
+                    password = data[searchterm].get('password')
+
+                    show_details(searchterm, username, password)
+
+                else:
+                    show_error(searchterm)
+
+def show_details(website, username, password):
+    messagebox.showinfo(website, f"Username: {username} \nPassword: {password}")
+
+def show_error(searchterm):
+    messagebox.showinfo("Not found", f"{searchterm} was not found")
+    
 # ---------------------------- UI SETUP ------------------------------- #
 
 window = tk.Tk()
@@ -106,8 +158,8 @@ password_label = tk.Label(text = "Password:")
 password_label.grid(column = 0, row = 3)
 
 # Entries
-website_entry = tk.Entry(width = 35)
-website_entry.grid(column=1, row=1, columnspan=2, sticky = "EW")
+website_entry = tk.Entry(width = 17)
+website_entry.grid(column=1, row=1, sticky = "EW")
 website_entry.focus_set() # Focus the cursor here
 
 email_entry = tk.Entry(width = 35)
@@ -118,6 +170,9 @@ password_entry = tk.Entry(width = 17)
 password_entry.grid(column=1, row=3, sticky = "EW")
 
 # Buttons
+search_button = tk.Button(text="Search", command = search_data)
+search_button.grid(column=2, row=1, sticky= 'EW')
+
 password_button = tk.Button(text="Generate Password", command = generate_password)
 password_button.grid(column=2, row=3, sticky = "EW")
 
